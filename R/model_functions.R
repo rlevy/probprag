@@ -392,7 +392,19 @@ run.lexical.uncertainty.WO <- function(lexica,lexicon.probabilities,prior,costs,
 #############################################################################################################
 
 #############################################################################################################
-### generate lexica
+### generate lexica for lexical uncertainty
+
+
+get.scalar.implicature.lexica <- function() {
+  signals <- c("all","some","0")
+  messages <- c("A","E~A")
+  result <- lapply(powerSetLessEmptyset(messages), function(possible.meanings) {
+    lexicon <- rbind(c(1,0),ifelse(messages %in% possible.meanings,1,0),c(1,1))
+    dimnames(lexicon) <- list(signals,messages)
+    return(lexicon)
+  })
+}
+
 
 basic.two.meaning.lexica <- function(messages=c("m1","m2"),signals=c("w1","w2"),use.null.utterance=F) {
 	### original two-message, two-word lexical uncertainty problem
@@ -605,3 +617,59 @@ run.lexical.uncertainty.WO <- function(lexica,lexicon.probabilities,prior,costs,
 
 ###
 #############################################################################################################
+
+
+
+#############################################################################################################
+### Expertise model (with Chris Potts)
+
+
+## N.J. Smith's "social anxiety" listener
+anxiety.L1.fnc <- function(l1,lexicon.probabilities,prior,verbose=FALSE) {
+  l1 <- lapply(s1, function(x) listener(x,prior,verbose=verbose))
+  f <- function(lexicon.probability,s1.given.Lex) {
+    lik <- apply(s1.given.Lex*prior,2,sum)
+    return(lexicon.probability*lik)
+  }
+  updated.lexicon.weights <- mapply(f,lexicon.probabilities,s1)
+  Z <- apply(updated.lexicon.weights,1,sum)
+  L1.Lex.given.u <- 1/Z*updated.lexicon.weights
+  l1.matrix <- sapply(l1,function(x) x,simplify='array')
+  g <- function(i,j) L1.Lex.given.u[i,j]*l1.matrix[i,,j]
+  tmp <- expand.grid(M=1:dim(l1.matrix)[1],N=1:dim(l1.matrix)[3])
+  tmp2 <- mapply(g,tmp$M,tmp$N)
+  dim(tmp2) <- dim(l1.matrix)[c(2,1,3)]
+  L1 <- aperm(tmp2,c(2,1,3))
+  dimnames(L1) <- dimnames(l1.matrix)
+  dimnames(L1)[[3]] <- paste("Lex",1:length(lexicon.probabilities),sep="")
+  return(list(l1=l1,L1=L1))
+}
+
+### this version will assume that the speaker has one target lexicon, instead of a target distribution over lexica
+expertise.utterance.utility.2 <- function(L1,alpha,beta,gamma,prior,costs,verbose=FALSE) {
+  L1.lexicon.probabilities <- apply(L1,c(1,3),sum)
+  L1.m.given.u <- apply(L1,c(1,2),sum)
+  tmp <- expand.grid(u=dimnames(L1)[[1]], m=dimnames(L1)[[2]], Lex=dimnames(L1)[[3]])
+  utility.function <- function(u,m,Lex) alpha * log(L1.m.given.u[u,m]) + beta * log(L1.lexicon.probabilities[u,Lex]) - gamma * costs[u]
+  tmp$utility <- with(tmp,mapply(utility.function,u,m,Lex))
+  result <- aperm(with(tmp,tapply(utility,list(u,m,Lex),function(x) x[1])),c(2,3,1))
+  return(result)
+}
+
+
+expertise.speaker <- function(listener,alpha,beta,gamma,prior,costs,lambda,verbose=FALSE) {
+  utility.matrix <- expertise.utterance.utility.2(listener,alpha,beta,gamma,prior,costs,verbose)
+  S2.weights <- exp(lambda * utility.matrix)
+  Z <- apply(S2.weights,c(1,2),sum)
+  result <- 1/c(Z) * S2.weights
+  return(result)
+}
+
+expertise.listener <- function(speaker.matrix,lexicon.probabilities,prior,verbose=FALSE) {
+  tmp <- expand.grid(m=dimnames(speaker.matrix)[[1]],Lex=dimnames(speaker.matrix)[[2]],u=dimnames(speaker.matrix)[[3]])
+  tmp$Lik <- with(tmp,speaker.matrix[cbind(m,Lex,u)] * prior[m] * lexicon.probabilities[Lex])
+  w <- with(tmp,tapply(Lik,list(u,m,Lex),function(x) x[1]))
+  Z <- apply(w,1,sum)
+  result <- w / Z
+  return(result)
+}
