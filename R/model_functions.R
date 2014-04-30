@@ -625,7 +625,7 @@ run.lexical.uncertainty.WO <- function(lexica,lexicon.probabilities,prior,costs,
 
 
 ## N.J. Smith's "social anxiety" listener
-anxiety.L1.fnc <- function(l1,lexicon.probabilities,prior,verbose=FALSE) {
+anxiety.L1.fnc <- function(s1,lexicon.probabilities,prior,verbose=FALSE) {
   l1 <- lapply(s1, function(x) listener(x,prior,verbose=verbose))
   f <- function(lexicon.probability,s1.given.Lex) {
     lik <- apply(s1.given.Lex*prior,2,sum)
@@ -672,4 +672,22 @@ expertise.listener <- function(speaker.matrix,lexicon.probabilities,prior,verbos
   Z <- apply(w,1,sum)
   result <- w / Z
   return(result)
+}
+
+run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,N=5,verbose=F) {
+  l0 <- lapply(lexica,function(x) listener(t(x),prior))
+  s1 <- lapply(NaNtoZero(l0),function(listener.matrix) speaker(listener.matrix,costs,lambda))
+  Listener <- list()
+  Speaker <- list()
+  L1 <- anxiety.L1.fnc(s1,lexicon.probabilities,prior)
+  Listener[[1]] <- L1$L1
+  Speaker[[1]] <- NULL
+  if(verbose) myPrintArray(round(L1,4))
+  for(i in 2:N) {
+    Speaker[[i]] <- expertise.speaker(Listener[[i-1]],alpha,beta,gamma,prior,costs,lambda)
+    if(verbose) myPrintArray(round(Speaker[[i]],3))
+    Listener[[i]] <- expertise.listener(Speaker[[i]],lexicon.probabilities,prior)
+    if(verbose) myPrintArray(round(Listener[[i]],3))
+  }
+  return(list(l0=l0,s1=s1,l1=L1$l1,Listener=Listener,Speaker=Speaker))
 }

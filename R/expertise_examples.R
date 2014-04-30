@@ -49,38 +49,24 @@ get.disjunction.lexica.known.words.for.all.atomic.meanings <- function() {
 }
 
 ### make sure atomic.meanings is lexicographically sorted
-generate.disjunction.lexica <- function(atomic.meanings,atomic.utterances,novel.word="X",disjunct.cost,null.cost) {
+generate.disjunction.lexica <- function(atomic.meanings,atomic.utterances,novel.word="X",disjunct.cost,null.cost,meanings.are.upper.sets=TRUE) {
   meaning.space <- sapply(powerSetLessEmptyset(atomic.meanings),function(x) paste(x,collapse="v"))
   utterance.contents <- powerSetLessEmptyset(c(atomic.utterances,novel.word))
   utterance.forms <- sapply(utterance.contents,function(x) paste(x,collapse="v"))
   f <- function(novel.word.meaning) {
     expanded.atomic.meanings <- c(atomic.meanings,novel.word.meaning)
     names(expanded.atomic.meanings) <- c(names(atomic.meanings),novel.word)
-    meanings <- lapply(utterance.contents,function(x) paste(sort(unique(expanded.atomic.meanings[x])),collapse="v"))
+    if(meanings.are.upper.sets) {
+      meanings <- lapply(utterance.contents,function(x) sort(unique(sapply(powerSetLessEmptyset(x), function(y) paste(sort(unique(expanded.atomic.meanings[y])),collapse="v")))))
+    } else {
+      meanings <- lapply(utterance.contents,function(x) paste(sort(unique(expanded.atomic.meanings[x])),collapse="v"))
+    }
     lexicon <- rbind(t(sapply(meanings,function(x) ifelse(meaning.space %in% x,1,0))), rep(1,length(meaning.space)))
     dimnames(lexicon) <- list(c(utterance.forms,"0"),meaning.space)
     return(lexicon)
   }
   utterance.costs <- c(sapply(utterance.contents,function(x) disjunct.cost*(length(x)-1)),null.cost)
   return(list(lexica=lapply(atomic.meanings,f),utterance.costs=utterance.costs))
-}
-
-run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,N=5) {
-  l0 <- lapply(lexica,function(x) listener(t(x),prior))
-  s1 <- lapply(NaNtoZero(l0),function(listener.matrix) speaker(listener.matrix,costs,lambda))
-  Listener <- list()
-  Speaker <- list()
-  L1 <- anxiety.L1.fnc(s1,lexicon.probabilities,prior)
-  Listener[[1]] <- L1$L1
-  Speaker[[1]] <- NULL
-  if(verbose) myPrintArray(round(L1,4))
-  for(i in 2:N) {
-    Speaker[[i]] <- expertise.speaker(Listener[[i-1]],alpha,beta,gamma,prior,costs,lambda)
-    if(verbose) myPrintArray(round(Speaker[[i]],3))
-    Listener[[i]] <- expertise.listener(Speaker[[i]],lexicon.probabilities,prior)
-    if(verbose) myPrintArray(round(Listener[[i]],3))
-  }
-  return(list(l0=l0,s1=s1,l1=L1$l1,Listener=Listener,Speaker=Speaker))
 }
 
 
@@ -121,6 +107,7 @@ lexica.and.costs <- generate.disjunction.lexica(atomic.meanings=c(A="1",B="2",C=
 meaning.space <- dimnames(lexica[[1]])[[2]]
 prior <- rep(1/length(meaning.space),length(meaning.space),names=meaning.space)
 lexica <- lexica.and.costs$lexica
+lexicon.probabilities <- rep(1/length(lexica),length(lexica))
 costs <- lexica.and.costs$utterance.costs
 
 l0 <- lapply(lexica,function(x) listener(t(x),prior))
@@ -139,7 +126,7 @@ myPrintArray(round(S3,3))
 L3 <- expertise.listener(S3,lexicon.probabilities,prior)
 myPrintArray(round(L3,3))
 
-result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha,beta=2,gamma,costs,lambda=3,N=5)
+result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha=1,beta=2,gamma=1,costs,lambda=3,N=5)
 myPrintArray(round(result$Speaker[[2]],3))
 
 myPrintArray(round(result$Listener[[2]][c("X","AvX","BvX","CvX"),c("1","2","3"),],3))
