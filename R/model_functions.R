@@ -124,7 +124,7 @@ plot.matrix.list <- function(matrix.list,label.lexica=F,...) {
 		abline(nrow(matrix.list[[1]])*i+0.5,0,lty=2,lwd=2.25)
 	if(label.lexica) 
 		for(i in 1:length(matrix.list))
-			text(0.3,nrow(matrix.list[[1]])*i,sprintf("$\\mathcal{L}_%i$",length(matrix.list)-i+1))
+			text(0.3,nrow(matrix.list[[1]])*i,sprintf("$\\mathcal{L}_{%i}$",length(matrix.list)-i+1))
 }
 
 make.matrix.movie <- function(res,dirname,movienameprefix="",fps=NULL,my.par=list(),height=360,width=360,...) {
