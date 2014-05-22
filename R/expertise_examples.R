@@ -218,15 +218,15 @@ lexica.and.costs <- generate.disjunction.lexica.2(atomic.meanings=c("1","2","3")
                                    novel.word="X",
                                    disjunct.cost=0.05,
                                    null.cost=4,
-                                   unknown.word.has.atomic.meaning=FALSE)
+                                   unknown.word.has.atomic.meaning=TRUE)
 lexica <- lexica.and.costs$lexica
 lexicon.probabilities <- rep(1/length(lexica),length(lexica))
 meaning.space <- dimnames(lexica[[1]])[[2]]
-##prior <- rep(1/length(meaning.space),length(meaning.space),names=meaning.space)
-prior <- c(rep(0.99/(length(meaning.space)-1), length(meaning.space)-1),0.01)
+prior <- rep(1/length(meaning.space),length(meaning.space),names=meaning.space)
+##prior <- c(rep(0.99/(length(meaning.space)-1), length(meaning.space)-1),0.01)
 costs <- lexica.and.costs$costs
 N <- 10
-result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha=1,beta=1,gamma=1,costs,lambda=3,N=N)
+result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha=1,beta=5,gamma=1,costs,lambda=3,N=N)
 key.speaker.result <- t(sapply(2:N, function(i) c(result$Speaker[[i]][1,1,c("A","X","AvX","0")])))
 dimnames(key.speaker.result)[[1]] <- paste("S",2:N,sep="")
 round(key.speaker.result,3)
@@ -248,6 +248,19 @@ myPrintArray(round(result$Speaker[[3]][c("1","2","3"),,],3))
 myPrintArray(round(result$Listener[[2]][c("X","AvX","BvX","CvX"),,],3))
 
 
+
+### show dependence of strength of inference for definitional disjunction as a function of value of lexicon
+betas <- seq(0,5,by=0.1)
+S3and4s <- sapply(betas, function(beta) {
+  result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha=1,beta=beta,gamma=1,costs,lambda=3,N=N)
+  return(c(result$Speaker[[3]][1,1,"AvX"],result$Speaker[[4]][1,1,"AvX"]))
+})
+
+pdf("~/tmp/S3andS4.pdf",height=4,width=8)
+old.par <- par(mfrow=c(1,2))
+plot(betas,S3and4s[1,],type='l',ylim=c(0,1),ylab="S3")
+plot(betas,S3and4s[2,],type='l',ylim=c(0,1),ylab="S4")
+dev.off()
 
 rr <- lapply(2:5, function(i) result$Speaker[[i]][,1,c("A","X","AvX","0")])
 dimnames(rr)[[1]] <- paste("S",2:5,sep="")
