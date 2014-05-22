@@ -81,6 +81,8 @@ generate.disjunction.lexica <- function(atomic.meanings,atomic.utterances,novel.
   return(list(lexica=lexica,utterance.costs=utterance.costs))
 }
 
+
+#### CHRIS USE THIS FUNCTION FOR NOW (RPL, 5/22/2014)
 ### names(atomic.utterance.meanings) will be the atomic utterances.  Note that not all atomic utterances need have atomic meanings. atomic.utterance.meanings should be a LIST
 generate.disjunction.lexica.2 <- function(atomic.meanings,atomic.utterance.meanings,novel.word="X",disjunct.cost,null.string="0",null.cost,meanings.are.upper.sets=TRUE,unknown.word.has.atomic.meaning=FALSE) {
   to.string <- function(x) paste(sort(x),collapse="v")
@@ -188,6 +190,9 @@ key.speaker.result <- t(sapply(2:5, function(i) c(result$Speaker[[i]][1,1,c("A",
 dimnames(key.speaker.result)[[1]] <- paste("S",2:5,sep="")
 round(key.speaker.result,3)
 
+
+
+### CHRIS: this example and the next one are probably what you want to play with
 lexica.and.costs <- generate.disjunction.lexica.2(atomic.meanings=c("1","2","3","4"),
                                                   atomic.utterance.meanings=list(A=c("1"),B=c("2"),C=c("3"),D=c("4")),
                                                   novel.word="X",
@@ -198,7 +203,7 @@ lexica <- lexica.and.costs$lexica
 lexicon.probabilities <- rep(1/length(lexica),length(lexica))
 meaning.space <- dimnames(lexica[[1]])[[2]]
 prior <- rep(1/length(meaning.space),length(meaning.space),names=meaning.space)
-##prior <- c(rep(0.999/(length(meaning.space)-1), length(meaning.space)-1),0.001)
+##prior <- c(rep(0.999/(length(meaning.space)-1), length(meaning.space)-1),0.001)  ## make "anything goes" meaning a priori unlikely
 costs <- lexica.and.costs$costs
 N <- 25
 result <- run.expertise.model(lexica,lexicon.probabilities,prior,alpha=1,beta=1,gamma=1,costs,lambda=2,N=N,verbose=F)
