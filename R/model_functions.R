@@ -142,8 +142,8 @@ make.matrix.movie <- function(res,dirname,movienameprefix="",fps=NULL,my.par=lis
     plot.matrix(t(res$res.speaker[[i+1]]),...)
     dev.off()
   }	
-  system(paste("/opt/local/bin/ffmpeg -y -r ",fps," -qscale 2 -i ",dirname,"/listener-%03d.jpg ",dirname,"/movie-listener.mp4",sep=""))
-  system(paste("/opt/local/bin/ffmpeg -y -r ",fps," -qscale 2 -i ",dirname,"/speaker-%03d.jpg ",dirname,"/movie-speaker.mp4",sep=""))
+  system(paste("/opt/local/bin/ffmpeg -y -r ",fps," -i ",dirname,"/listener-%03d.jpg ",dirname,"/movie-listener.mp4",sep=""))
+  system(paste("/opt/local/bin/ffmpeg -y -r ",fps," -i ",dirname,"/speaker-%03d.jpg ",dirname,"/movie-speaker.mp4",sep=""))
 }
 
 
@@ -674,12 +674,14 @@ expertise.listener <- function(speaker.matrix,lexicon.probabilities,prior,verbos
   return(result)
 }
 
-run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,N=5,verbose=F) {
-  l0 <- lapply(lexica,function(x) listener(t(x),prior))
-  s1 <- lapply(NaNtoZero(l0),function(listener.matrix) speaker(listener.matrix,costs,lambda))
+run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,lambda.s1=NULL,N=5,verbose=F) {
+  if(is.null(lambda.s1))
+    lambda.s1 <- lambda
+  l0 <- lapply(lexica,function(x) listener(t(x),prior,verbose=verbose))
+  s1 <- lapply(NaNtoZero(l0),function(listener.matrix) speaker(listener.matrix,costs,lambda.s1,verbose=verbose))
   Listener <- list()
   Speaker <- list()
-  L1 <- anxiety.L1.fnc(s1,lexicon.probabilities,prior)
+  L1 <- anxiety.L1.fnc(s1,lexicon.probabilities,prior,verbose=verbose)
   Listener[[1]] <- L1$L1
   Speaker[[1]] <- NULL
   if(verbose) myPrintArray(round(L1,4))
@@ -690,4 +692,30 @@ run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,ga
     if(verbose) myPrintArray(round(Listener[[i]],3))
   }
   return(list(l0=l0,s1=s1,l1=L1$l1,Listener=Listener,Speaker=Speaker))
+}
+
+### This variant of the model skips l0 and s1, going straight from the lexicon to L1 according to:
+## L1(Lex,m|u) \propto P(Lex) P(m) Lex(u,m)/|Lex(m)|
+## L1(Lex|u) \propto \sum_m L1(Lex,m|u) P(m)
+##
+## There is an option to include a cost weighting in the Lex->L1 step.  If we use this, the first equation is:
+## L1(Lex,m|u) \propto P(Lex) P(m) e^{-cost(u)} Lex(u,m)/ [ \sum_{u \in Lex(m)} e^{-cost(u)} ]
+run.expertise.model.2 <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,N=5,verbose=FALSE) {
+  Listener <- list()
+  Speaker <- list()
+  tmp <- lapply(lexica,function(lexicon) { 
+    lexicon.transposed <- t(lexicon)
+    Z <- apply(lexicon.transposed,1,sum)
+    lexicon.transposed / Z })
+  L1 <- anxiety.L1.fnc(tmp,lexicon.probabilities,prior)
+  Listener[[1]] <- L1$L1
+  Speaker[[1]] <- NULL
+  if(verbose) myPrintArray(round(L1,4))
+  for(i in 2:N) {
+    Speaker[[i]] <- expertise.speaker(Listener[[i-1]],alpha,beta,gamma,prior,costs,lambda)
+    if(verbose) myPrintArray(round(Speaker[[i]],3))
+    Listener[[i]] <- expertise.listener(Speaker[[i]],lexicon.probabilities,prior)
+    if(verbose) myPrintArray(round(Listener[[i]],3))
+  }
+  return(list(Listener=Listener,Speaker=Speaker))
 }
