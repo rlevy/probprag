@@ -115,7 +115,7 @@ plot.matrix <- function(matr,listener=T,label.xy=T,xloc="bottom",transpose=F,...
 }
 
 
-plot.matrix.list <- function(matrix.list,label.lexica=F,...) {
+plot.matrix.list <- function(matrix.list,label.lexica=F,list.start.index=1,...) {
 	matrices <- matrix.list[[1]]
 	for(i in 2:length(matrix.list))
 		matrices <- rbind(matrices,matrix.list[[i]])
@@ -124,7 +124,7 @@ plot.matrix.list <- function(matrix.list,label.lexica=F,...) {
 		abline(nrow(matrix.list[[1]])*i+0.5,0,lty=2,lwd=2.25)
 	if(label.lexica) 
 		for(i in 1:length(matrix.list))
-			text(0.3,nrow(matrix.list[[1]])*i,sprintf("$\\mathcal{L}_{%i}$",length(matrix.list)-i+1))
+			text(0.3,nrow(matrix.list[[1]])*i,sprintf("$\\mathcal{L}_{%i}$",length(matrix.list)-i+list.start.index))
 }
 
 make.matrix.movie <- function(res,dirname,movienameprefix="",fps=NULL,my.par=list(),height=360,width=360,...) {
@@ -233,8 +233,12 @@ run.simple.model <- function(pmatrix,prior,costs,lambda,N,verbose=F) {
 
 
 ### Lexical uncertainty stuff
-marginalizing.listener <- function(speaker.matrices,lexicon.probabilities,prior,verbose=TRUE) {
+marginalizing.listener <- function(speaker.matrices,lexicon.probabilities,prior,verbose=FALSE) {
 	listener.matrices <- lapply(speaker.matrices, function(matr) tmp <- prior * matr)
+  if(verbose) {
+    cat("l1 listener matrices:")
+    print(listener.matrices)
+  }
 	weighted.listener.matrices <- lapply(1:length(listener.matrices), function(i) listener.matrices[[i]] * lexicon.probabilities[i])
 	res.unnormalized <- Reduce('+',weighted.listener.matrices)
 	Z <- apply(res.unnormalized,2,sum)
@@ -674,9 +678,12 @@ expertise.listener <- function(speaker.matrix,lexicon.probabilities,prior,verbos
   return(result)
 }
 
-run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,lambda.s1=NULL,N=5,verbose=F) {
+format.costs <- function(costs) paste("(",paste(mapply(function(x,y) paste(x,":",y,sep=""),names(costs),costs),collapse="; "),")")
+run.expertise.model <- function(lexica,lexicon.probabilities,prior,alpha,beta,gamma,costs,lambda,lambda.s1=NULL,N=5,verbose=F,show.params=FALSE) {
   if(is.null(lambda.s1))
     lambda.s1 <- lambda
+  if(show.params)
+    cat("Running expertise model with parameters alpha=",alpha,", beta=",beta,", gamma=",gamma,", lambda=",lambda,", lambda.s1=",lambda.s1,"\nCosts=",format.costs(costs),"\n",sep="")
   l0 <- lapply(lexica,function(x) listener(t(x),prior,verbose=verbose))
   s1 <- lapply(NaNtoZero(l0),function(listener.matrix) speaker(listener.matrix,costs,lambda.s1,verbose=verbose))
   Listener <- list()
